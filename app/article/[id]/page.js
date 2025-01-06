@@ -41,13 +41,13 @@ export default function ArticlePage({ params: paramsPromise }) {
       setLoading(false);
     };
 
-    const logVisit = async () => {
-      await fetch('/api/log-visit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ articleId: id }),
-      });
-    };
+    // const logVisit = async () => {
+    //   await fetch('/api/log-visit', {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify({ articleId: id }),
+    //   });
+    // };
 
     const fetchVisitorCount = async () => {
       const { count, error } = await supabase
@@ -61,7 +61,6 @@ export default function ArticlePage({ params: paramsPromise }) {
     };
 
     fetchArticle();
-    logVisit();
     fetchVisitorCount();
   }, [id]);
 
