@@ -46,7 +46,7 @@ export default function HomePage() {
       const existingTitles = new Set(existingArticles.map((article) => article.title));
 
       const response = await fetch(
-        'https://newsdata.io/api/1/latest?apikey=pub_64142c718a17d829478a23b1319a33ebfca15&q=apple$language=english'
+        'https://newsdata.io/api/1/latest?apikey=pub_64142c718a17d829478a23b1319a33ebfca15&q=startup$language=english'
       );
       const data = await response.json();
 
