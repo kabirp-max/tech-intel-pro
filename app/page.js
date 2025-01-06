@@ -97,7 +97,7 @@ export default function HomePage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `http://google.com`,
+        redirectTo: `${window.location.origin}`,
       },
     });
 
