@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { FiLogOut, FiTrash2 } from 'react-icons/fi';
+import { BsPersonCircle } from 'react-icons/bs';
 
 export default function HomePage() {
   const [articles, setArticles] = useState([]);
@@ -12,7 +14,10 @@ export default function HomePage() {
   useEffect(() => {
     const fetchUser = async () => {
       const { data: user } = await supabase.auth.getUser();
-      setUser(user.user);
+      if (user.user) {
+        const emailName = user.user.email.split('@')[0];
+        setUser({ ...user.user, name: emailName });
+      }
     };
 
     const fetchArticles = async () => {
@@ -31,27 +36,17 @@ export default function HomePage() {
 
   const fetchNewArticles = async () => {
     setLoading(true);
-
     try {
-      const { data: existingArticles, error: existingError } = await supabase
-        .from('Articles')
-        .select('title');
-
-      if (existingError) {
-        console.error('Error fetching existing articles:', existingError);
-        setLoading(false);
-        return;
-      }
-
+      const { data: existingArticles } = await supabase.from('Articles').select('title');
       const existingTitles = new Set(existingArticles.map((article) => article.title));
 
       const response = await fetch(
-        'https://newsdata.io/api/1/latest?apikey=pub_64142c718a17d829478a23b1319a33ebfca15&q=startup$language=english'
+        'https://newsdata.io/api/1/latest?apikey=pub_64142c718a17d829478a23b1319a33ebfca15&q=usa$language=english'
       );
       const data = await response.json();
 
       if (data.results) {
-        let uniqueArticles = data.results.filter(
+        const uniqueArticles = data.results.filter(
           (article) => !existingTitles.has(article.title)
         );
 
@@ -61,73 +56,34 @@ export default function HomePage() {
           return;
         }
 
-        uniqueArticles = [uniqueArticles[0]];
-
-        const formattedArticles = uniqueArticles.map((article) => ({
+        const formattedArticles = uniqueArticles.slice(0, 1).map((article) => ({
           title: article.title,
           content: article.description || '',
           author: article.creator ? article.creator.join(', ') : 'Unknown',
           image: article.image_url || '',
         }));
 
-        const { error: insertError } = await supabase.from('Articles').insert(formattedArticles);
-
-        if (insertError) {
-          console.error('Error storing articles in Supabase:', insertError);
-        } else {
-          alert('New unique articles fetched and saved!');
-          const { data: updatedArticles, error: fetchError } = await supabase
-            .from('Articles')
-            .select('*');
-          if (fetchError) {
-            console.error('Error fetching updated articles:', fetchError);
-          } else {
-            setArticles(updatedArticles);
-          }
-        }
+        await supabase.from('Articles').insert(formattedArticles);
+        const { data: updatedArticles } = await supabase.from('Articles').select('*');
+        setArticles(updatedArticles);
+        // alert('New unique articles fetched and saved!');
       }
     } catch (error) {
       console.error('Error fetching new articles:', error);
     }
-
     setLoading(false);
   };
 
-  const signIn = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}`,
-      },
-    });
-
-    if (error) {
-      console.log(error);
-    } else {
-      alert('Signed in successfully');
-    }
-  };
-
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('Error signing out:', error);
-    } else {
-      setUser(null);
-      alert('Signed out successfully');
-    }
+    await supabase.auth.signOut();
+    setUser(null);
+    alert('Signed out successfully');
   };
 
   const deleteArticle = async (id) => {
-    const confirmed = confirm('Do you want to delete this article?');
-    if (confirmed) {
-      const { error } = await supabase.from('Articles').delete().eq('id', id);
-      if (error) {
-        console.error('Error deleting article:', error);
-      } else {
-        alert('Article deleted successfully');
-        setArticles(articles.filter((article) => article.id !== id));
-      }
+    if (confirm('Do you want to delete this article?')) {
+      await supabase.from('Articles').delete().eq('id', id);
+      setArticles(articles.filter((article) => article.id !== id));
     }
   };
 
@@ -139,93 +95,90 @@ export default function HomePage() {
     <div style={styles.container}>
       {/* Navbar */}
       <nav style={styles.navbar}>
-        <div style={styles.navBrand}>My Articles</div>
+        <div style={styles.navBrand}>Tech Intel Pro</div>
         <div style={styles.navLinks}>
           <Link href="/" style={styles.navLink}>
             Home
           </Link>
-          <Link href="/add-article" style={styles.navLink}>
-            Add Article
-          </Link>
-          <Link href="/about-us" style={styles.navLink}>
-            About Us
+          <Link href="/dashboard" style={styles.navLink}>
+            Dashboard
           </Link>
         </div>
         <div style={styles.userInfo}>
           {user ? (
             <>
-              <span style={styles.userName}>{user.email}</span>
+              <BsPersonCircle size={24} style={styles.userIcon} />
+              <span style={styles.userName}>{user.name}</span>
               <button onClick={signOut} style={styles.signOutButton}>
-                Sign Out
+                <FiLogOut /> Sign Out
               </button>
             </>
           ) : (
-            <button onClick={signIn} style={styles.signInButton}>
+            <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} style={styles.signInButton}>
               Sign In
             </button>
           )}
         </div>
       </nav>
 
-      {/* Page Content */}
-      <div style={styles.mainContent}>
-        <h1 style={styles.heading}>Welcome to the Homepage</h1>
-        <button onClick={fetchNewArticles} style={styles.fetchButton}>
-          Fetch New Articles
-        </button>
+      {/* Main Content */}
+      <main style={styles.mainContent}>
+        <div style={styles.header}>
+          <h1 style={styles.heading}>Welcome to the Homepage</h1>
+          <button onClick={fetchNewArticles} style={styles.fetchButton}>
+            Fetch New Articles
+          </button>
+        </div>
 
-        <p style={styles.subheading}>Explore the latest articles below:</p>
         <div style={styles.grid}>
           {articles.slice().reverse().map((article) => (
             <div key={article.id} style={styles.card}>
               <img
-                src={
-                  article.image ||
-                  'https://via.placeholder.com/300x200?text=No+Image'
-                }
+                src={article.image || 'https://via.placeholder.com/300x200?text=No+Image'}
                 alt={article.title}
                 style={styles.thumbnail}
               />
-              <h2 style={styles.cardTitle}>{article.title}</h2>
-              <p style={styles.cardAuthor}>By: {article.author || 'Unknown'}</p>
-              <Link href={`/article/${article.id}`} style={styles.readMore}>
-                Read More
-              </Link>
-              <button
-                onClick={() => deleteArticle(article.id)}
-                style={styles.deleteButton}
-              >
-                Delete
-              </button>
+              <div style={styles.cardBody}>
+                <h2 style={styles.cardTitle}>{article.title}</h2>
+                <p style={styles.cardAuthor}>By: {article.author || 'Unknown'}</p>
+                <Link href={`/article/${article.id}`} style={styles.readMore}>
+                  Read More
+                </Link>
+                <p></p>
+                {/* <button onClick={() => deleteArticle(article.id)} style={styles.deleteButton}>
+                  <FiTrash2 /> 
+                </button> */}
+              </div>
             </div>
           ))}
         </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer style={styles.footer}>
+        <p>&copy; {new Date().getFullYear()} My Articles. All rights reserved.</p>
+      </footer>
     </div>
   );
 }
 
-
-
 const styles = {
   container: {
     fontFamily: 'Arial, sans-serif',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f4f4f4',
     color: '#333',
-    padding: 0,
-    margin: 0,
-    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: '100vh',
   },
   navbar: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#0070f3',
-    padding: '10px 20px',
     color: '#fff',
-    position: 'sticky',
-    top: 0,
-    zIndex: 1000,
+    padding: '10px 20px',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
   navBrand: {
     fontSize: '20px',
@@ -239,21 +192,55 @@ const styles = {
     color: '#fff',
     textDecoration: 'none',
     fontSize: '16px',
-    fontWeight: '500',
+  },
+  userInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  userIcon: {
+    color: '#fff',
+  },
+  userName: {
+    color: '#fff',
+    textTransform: 'capitalize',
+  },
+  signOutButton: {
+    backgroundColor: '#ff4d4f',
+    border: 'none',
+    padding: '8px 12px',
+    borderRadius: '5px',
+    color: '#fff',
+    cursor: 'pointer',
+  },
+  signInButton: {
+    backgroundColor: '#0070f3',
+    border: 'none',
+    padding: '8px 12px',
+    borderRadius: '5px',
+    color: '#fff',
+    cursor: 'pointer',
   },
   mainContent: {
     padding: '20px',
+    flexGrow: 1,
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '20px',
   },
   heading: {
-    fontSize: '28px',
-    textAlign: 'center',
-    margin: '20px 0',
+    fontSize: '24px',
   },
-  subheading: {
-    fontSize: '18px',
-    textAlign: 'center',
-    margin: '10px 0 20px',
-    color: '#666',
+  fetchButton: {
+    padding: '10px 20px',
+    backgroundColor: '#28a745',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
   },
   grid: {
     display: 'grid',
@@ -263,31 +250,48 @@ const styles = {
   card: {
     backgroundColor: '#fff',
     borderRadius: '8px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
     overflow: 'hidden',
-    transition: 'transform 0.2s ease',
-    cursor: 'pointer',
   },
   thumbnail: {
     width: '100%',
     height: '150px',
     objectFit: 'cover',
   },
+  cardBody: {
+    padding: '10px',
+  },
   cardTitle: {
     fontSize: '18px',
-    margin: '10px 15px',
+    fontWeight: 'bold',
   },
   cardAuthor: {
     fontSize: '14px',
-    margin: '0 15px',
-    color: '#666',
+    color: '#555',
   },
   readMore: {
     display: 'inline-block',
-    margin: '15px',
+    marginTop: '10px',
     color: '#0070f3',
-    fontWeight: 'bold',
     textDecoration: 'none',
+    fontWeight: 'bold',
+  },
+  deleteButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    marginTop: '10px',
+    backgroundColor: '#ff4d4f',
+    color: '#fff',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  footer: {
+    backgroundColor: '#333',
+    color: '#fff',
+    textAlign: 'center',
+    padding: '10px 0',
   },
   loading: {
     textAlign: 'center',
