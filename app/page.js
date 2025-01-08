@@ -5,21 +5,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { FiLogOut, FiTrash2 } from 'react-icons/fi';
 import { BsPersonCircle } from 'react-icons/bs';
+import { useUser } from './Context/UserContext';
 
 export default function HomePage() {
+  const { user, setUser, loading: userLoading } = useUser();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: user } = await supabase.auth.getUser();
-      if (user.user) {
-        const emailName = user.user.email.split('@')[0];
-        setUser({ ...user.user, name: emailName });
-      }
-    };
-
     const fetchArticles = async () => {
       const { data, error } = await supabase.from('Articles').select('*');
       if (error) {
@@ -30,7 +23,6 @@ export default function HomePage() {
       setLoading(false);
     };
 
-    fetchUser();
     fetchArticles();
   }, []);
 
@@ -66,7 +58,6 @@ export default function HomePage() {
         await supabase.from('Articles').insert(formattedArticles);
         const { data: updatedArticles } = await supabase.from('Articles').select('*');
         setArticles(updatedArticles);
-        // alert('New unique articles fetched and saved!');
       }
     } catch (error) {
       console.error('Error fetching new articles:', error);
@@ -87,7 +78,7 @@ export default function HomePage() {
     }
   };
 
-  if (loading) {
+  if (loading || userLoading) {
     return <p style={styles.loading}>Loading...</p>;
   }
 
@@ -114,7 +105,10 @@ export default function HomePage() {
               </button>
             </>
           ) : (
-            <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} style={styles.signInButton}>
+            <button
+              onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
+              style={styles.signInButton}
+            >
               Sign In
             </button>
           )}
@@ -144,10 +138,6 @@ export default function HomePage() {
                 <Link href={`/article/${article.id}`} style={styles.readMore}>
                   Read More
                 </Link>
-                <p></p>
-                {/* <button onClick={() => deleteArticle(article.id)} style={styles.deleteButton}>
-                  <FiTrash2 /> 
-                </button> */}
               </div>
             </div>
           ))}
@@ -161,6 +151,7 @@ export default function HomePage() {
     </div>
   );
 }
+
 
 const styles = {
   container: {
