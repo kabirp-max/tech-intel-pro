@@ -13,7 +13,6 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('articles');
   const [loading, setLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
-  const [selectedUser, setSelectedUser] = useState('all');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -62,30 +61,30 @@ export default function Dashboard() {
         });
     
         // Extract unique users from UserArticleVisits
-        const uniqueUsers = filteredUserArticleVisits.reduce((acc, userVisit) => {
-          if (!acc.some(user => user.user_id === userVisit.user_id)) {
-            acc.push({
-              user_id: userVisit.user_id,
-              user_name: userVisit.user_name,
-            });
-          }
-          return acc;
-        }, []);
-        
+        const uniqueUsers = [
+          ...new Map(
+            filteredUserArticleVisits.map((userVisit) => [
+              userVisit.user_id, // using user_id as the key to ensure uniqueness
+              { user_id: userVisit.user_id, user_name: userVisit.user_name },
+            ])
+          ).values(),
+        ];
+    
+        console.log(filteredUserArticleVisits);
+    
         setArticles(articlesWithVisitorCount);
         setUserArticles(filteredUserArticleVisits);
         setUsers(uniqueUsers);
-        
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
+    
 
     fetchData();
-}, []);
-
+  }, []);
 
   const sortData = (data, key) => {
     let direction = 'ascending';
@@ -126,16 +125,14 @@ export default function Dashboard() {
     setActiveTab(tab);
   };
 
-  const handleUserChange = (event) => {
-    const userId = event.target.value;
-    console.log(event.target.value);
+  const handleUserClick = (userId) => {
+    console.log('hi');
     
-    setSelectedUser(userId);
+    const userVisits = userArticles.filter((visit) => visit.user_id === userId);
+    setUserArticles(userVisits);
   };
 
   const formatDate = (date) => new Date(date).toLocaleDateString();
-
-  const filteredUserArticles = selectedUser === 'all' ? userArticles : userArticles.filter((entry) => entry.user_id === selectedUser);
 
   if (loading) return <p>Loading...</p>;
 
@@ -162,12 +159,12 @@ export default function Dashboard() {
         >
           User-Article
         </div>
-        {/* <div
+        <div
           style={activeTab === 'users' ? styles.activeTab : styles.tab}
           onClick={() => handleTabChange('users')}
         >
           Users
-        </div> */}
+        </div>
       </div>
 
       {activeTab === 'articles' && (
@@ -187,60 +184,46 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-            {articles.map((article, i) => (
-  <tr key={uuidv4()}> {/* Use article.id or any other unique identifier */}
-    <td style={styles.tableCell}>{i + 1}</td>
-    <td style={styles.tableCell}>{article.title}</td>
-    <td style={styles.tableCell}>{formatDate(article.created_at)}</td>
-    <td style={styles.tableCell}>{article.visitorCount}</td>
-  </tr>
-))}
-
+              {articles.map((article, i) => (
+                <tr key={uuidv4()}>
+                  <td style={styles.tableCell}>{i+1}</td>
+                  <td style={styles.tableCell}>{article.title}</td>
+                  <td style={styles.tableCell}>{formatDate(article.created_at)}</td>
+                  <td style={styles.tableCell}>{article.visitorCount}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
-{activeTab === 'user-article' && (
-  <div>
-    <h1>User Article Interactions</h1>
-    {users.forEach(i => {
-      console.log(i);
-      
-    })}
-    <select onChange={handleUserChange} value={selectedUser} style={styles.select}>
-      <option value="all">All</option>
-      {users.map((user) => (
-        <option key={uuidv4()} value={user.user_id}>
-          {user.user_name}
-        </option>
-      ))}
-    </select>
-    <table style={styles.table}>
-      <thead>
-        <tr>
-          <th style={styles.tableHeader}>Sr no.</th>
-          <th style={styles.tableHeader}>Title</th>
-          <th style={styles.tableHeader}>User Name</th>
-          <th onClick={() => sortUserArticles('created_at')} style={styles.tableHeader}>
-            Created At {getSortIcon('created_at')}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {filteredUserArticles.map((entry, i) => (
-          <tr key={uuidv4()}>
-            <td style={styles.tableCell}>{i + 1}</td>
-            <td style={styles.tableCell}>{entry.title}</td>
-            <td style={styles.tableCell}>{entry.user_name}</td>
-            <td style={styles.tableCell}>{formatDate(entry.created_at)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-)}
-
+      {activeTab === 'user-article' && (
+        <div>
+          <h1>User Article Interactions</h1>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.tableHeader}>Sr no.</th>
+                <th style={styles.tableHeader}>Title</th>
+                <th style={styles.tableHeader}>User Name</th>
+                <th onClick={() => sortUserArticles('created_at')} style={styles.tableHeader}>
+                  Created At {getSortIcon('created_at')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {userArticles.map((entry, i) => (
+                <tr key={uuidv4()}>
+                  <td style={styles.tableCell}>{i+1}</td>
+                  <td style={styles.tableCell}>{entry.title}</td>
+                  <td style={styles.tableCell}>{entry.user_name}</td>
+                  <td style={styles.tableCell}>{formatDate(entry.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {activeTab === 'users' && (
         <div>
@@ -256,7 +239,10 @@ export default function Dashboard() {
             <tbody>
               {users.map((user) => (
                 <tr key={uuidv4()}>
-                  <td style={styles.tableCell}>
+                  <td
+                    style={styles.tableCell}
+                    onClick={() => handleUserClick(user.user_id)}
+                  >
                     {user.user_name}
                   </td>
                 </tr>
@@ -304,9 +290,5 @@ const styles = {
   tableCell: {
     padding: '10px',
     borderBottom: '1px solid #ddd',
-  },
-  select: {
-    margin: '10px',
-    padding: '5px',
   },
 };
